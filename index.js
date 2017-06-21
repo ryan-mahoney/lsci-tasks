@@ -1,55 +1,58 @@
-// Load the AWS SDK for Node.js
-const AWS = require('aws-sdk');
-const fs = require('fs');
+const startTime = new Date().getTime() / 1000 | 0;
 const execSync = require('child_process').execSync;
-
-// Load credentials and set region from JSON file
-const awsConfig = {
-  accessKeyId: process.env.accessKeyId,
-  secretAccessKey: process.env.secretAccessKey,
-  region: process.env.region
+const aws = require(__dirname + '/models/aws.js')();
+const instanceModel = require(__dirname + '/models/instance.js')(aws, process.env.instanceId);
+const commit = {
+  provider: process.env.provider,
+  owner: process.env.owner,
+  repo: process.env.repo,
+  hash: process.env.hash
 };
-fs.writeFileSync('/tmp/config.json', JSON.stringify(awsConfig));
-AWS.config.loadFromPath('/tmp/config.json');
-const s3 = new AWS.S3();
-const ec2 = new AWS.EC2({apiVersion: '2016-11-15'});
-const baseParams = {
-  Bucket: process.env.bucket
-};
-
-const tokenParams = Object.assign(baseParams, {
-  Key: 'tokens/' + process.env.provider + '.txt'
-});
+const taskModel = require(__dirname + '/models/task.js')(aws, commit);
+const s3 = new aws.S3();
+const baseS3Params = {Bucket: process.env.bucket};
+const tokenS3Params = Object.assign(baseS3Params, {Key: 'tokens/' + process.env.provider + '.txt'});
+const repoPath = __dirname + '/repo';
 
 // Read provider token from aws
-s3.getObject(tokenParams).promise().then((response) => {
+s3.getObject(tokenS3Params).promise().then((response) => {
   return JSON.parse(response.Body.toString('utf-8'));
-}).then((providerToken) => {
 
-  // clone repository
-  const repoPath = __dirname + '/repo';
-  const cloneCommand = `git clone https://${providerToken.access_token}@${process.env.provider}.com/${process.env.owner}/${process.env.repo}.git ${repoPath}`;
+}).then((providerToken) => {
+  // Clone repository
+  const cloneCommand = `git clone https://${providerToken.access_token}@${commit.provider}.com/${commit.owner}/${commit.repo}.git ${repoPath}`;
   const cloneOutput = execSync(cloneCommand);
 
-  // reset to commit hash
+  // Reset to commit hash
   const resetCommand = `cd ${repoPath} && git reset --hard ${process.env.hash}`
   const resetOutput = execSync(resetCommand);
 
-  // parse tasks
+  // Parse the tasks
+  return new Promise((resolve) => {
+    resolve([]);
+  });
+}).then((tasks) => {
 
-  // run tasks
+  // assign each job to a variable
+  const allTasks = tasks.map((task) => {
+    return taskModel.run(task);
+  });
 
+  // return when all promises have been resolved
+  return Promise.all(allTasks);
+
+}).then(() => {
+
+  // Call home with final timing
+  const totalSeconds = (new Date().getTime() / 1000 | 0) - startTime;
+
+}).then(() => {
+
+  // Shutdown the instance
+  instanceModel.destroy();
+
+// Handle any errors
 }).catch((err) => {
   console.log(err);
-});
-
-// Terminate aws instance
-var params = {
-  InstanceIds: [process.env.instanceId],
-  DryRun: false
-};
-ec2.terminateInstances(params).promise().then((data) => {
-  console.log(data);
-}).catch((err) => {
-  console.log(err);
+  instanceModel.destroy();
 });
