@@ -1,34 +1,47 @@
 // Load the AWS SDK for Node.js
-var AWS = require('aws-sdk');
-var fs = require('fs');
-var spawn = require('child_process').spawnSync;
+const AWS = require('aws-sdk');
+const fs = require('fs');
+const execSync = require('child_process').execSync;
 
 // Load credentials and set region from JSON file
-var config = {
+const awsConfig = {
   accessKeyId: process.env.accessKeyId,
   secretAccessKey: process.env.secretAccessKey,
   region: process.env.region
 };
-fs.writeFileSync('/tmp/config.json', JSON.stringify(config));
+fs.writeFileSync('/tmp/config.json', JSON.stringify(awsConfig));
 AWS.config.loadFromPath('/tmp/config.json');
-
-// Read in the file, convert it to base64, store to S3
-var s3 = new AWS.S3();
-var params = {
-  Bucket: process.env.bucket,
-  Key: 'ci-test.txt',
-  Body: new Buffer('CI is working', 'binary'),
-  ACL: 'public-read'
+const s3 = new AWS.S3();
+const ec2 = new AWS.EC2({apiVersion: '2016-11-15'});
+const baseParams = {
+  Bucket: process.env.bucket
 };
 
-s3.putObject(params).promise().then(() => {
-  console.log('wrote test file');
+const tokenParams = Object.assign(baseParams, {
+  Key: 'tokens/' + process.env.provider + '.txt'
+});
+
+// Read provider token from aws
+s3.getObject(tokenParams).promise().then((response) => {
+  return JSON.parse(response.Body.toString('utf-8'));
+}).then((providerToken) => {
+
+  // clone repository
+  const repoPath = __dirname + '/repo';
+  const cloneCommand = `git clone https://${providerToken.access_token}@${process.env.provider}.com/${process.env.owner}/${process.env.repo}.git ${repoPath}`;
+  const cloneOutput = execSync(cloneCommand);
+
+  // reset to commit hash
+  const resetCommand = `cd ${repoPath} && git reset --hard ${process.env.hash}`
+  const resetOutput = execSync(resetCommand);
+
+  // parse tasks
+
+  // run tasks
+
 }).catch((err) => {
   console.log(err);
 });
-
-// Create EC2 service object
-var ec2 = new AWS.EC2({apiVersion: '2016-11-15'});
 
 // Terminate aws instance
 var params = {
