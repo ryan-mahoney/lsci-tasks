@@ -7,7 +7,7 @@ const spawnSync = require('child_process').spawnSync;
 module.exports = (aws, commit, repoPath, repoModel) => {
 
   const run = (task) => {
-    console.log(task);
+
     // start timer
     const startTime = new Date().getTime() / 1000 | 0;
 
@@ -25,7 +25,6 @@ module.exports = (aws, commit, repoPath, repoModel) => {
     const totalSeconds = (new Date().getTime() / 1000 | 0) - startTime;
     const state = (result.status == 1) ? 'failure' : 'success';
     const stdout = convert.toHtml(result.stdout);
-    console.log(stdout);
     const stderr = convert.toHtml(result.stderr);
     const status = {provider: commit.provider, tasks: [{
       name: task.name,
@@ -46,7 +45,6 @@ module.exports = (aws, commit, repoPath, repoModel) => {
     // run subtasks
     const subtasks = task.tasks || [];
     subtasks.forEach((subtask) => {
-      console.log(subtask);
       asyncTasks.push(run(subtask));
     });
 
@@ -56,7 +54,7 @@ module.exports = (aws, commit, repoPath, repoModel) => {
 
   return {
     run: (task) => {
-      run(task);
+      return run(task);
     }
   };
 };

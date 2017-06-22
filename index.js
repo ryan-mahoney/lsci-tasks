@@ -6,6 +6,7 @@ const commit = {
   status_callback: process.env.status_callback,
   final_callback: process.env.final_callback
 };
+const request = require('axios');
 const repoPath = __dirname + '/repo';
 const startTime = new Date().getTime() / 1000 | 0;
 const aws = require(__dirname + '/models/aws.js')();
@@ -13,7 +14,7 @@ const instanceModel = require(__dirname + '/models/instance.js')(aws, process.en
 const repoModel = require(__dirname + '/models/repo.js')(aws, commit, repoPath);
 const taskModel = require(__dirname + '/models/task.js')(aws, commit, repoPath, repoModel);
 
-// Read provider token from aws
+// read provider token from aws
 repoModel.retrieveToken().then((providerToken) => {
   repoModel.clone(providerToken.access_token);
   repoModel.reset();
@@ -28,17 +29,20 @@ repoModel.retrieveToken().then((providerToken) => {
   return Promise.all(allTasks);
 
 }).then(() => {
-
-  // Call home with final timing
+  // call home with final timing
   const totalSeconds = (new Date().getTime() / 1000 | 0) - startTime;
+  const final = {
+    hash: commit.hash,
+    time: totalSeconds
+  };
+  return request.post(commit.final_callback, final);
 
 }).then(() => {
-
-  // Shutdown the instance
-  //instanceModel.destroy();
+  // shutdown the instance
+  instanceModel.destroy();
   process.exit()
 
-// Handle any errors
+// handle any errors
 }).catch((err) => {
   console.log('ERROR');
   console.log(err);
