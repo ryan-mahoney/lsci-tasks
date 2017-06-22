@@ -1,7 +1,8 @@
 module.exports = (aws, instanceId) => {
   const ec2 = new aws.EC2();
 
-  const destroy = () {
+  const destroy = () => {
+    return;
     // Terminate aws instance
     const params = {InstanceIds: [instanceId], DryRun: false};
     ec2.terminateInstances(params).promise().then((data) => {

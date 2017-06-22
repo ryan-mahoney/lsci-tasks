@@ -9,6 +9,9 @@
   "license": "Apache-2.0",
   "dependencies": {
     "bluebird": "^3.5.0",
-    "aws-sdk": "^2.51.0"
+    "aws-sdk": "^2.51.0",
+    "yamljs": "^0.2.10",
+    "ansi-to-html": "^0.6.2",
+    "axios": "^0.16.2"
   }
 }
